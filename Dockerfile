@@ -17,14 +17,16 @@
 
 FROM alpine
 
-LABEL maintainer="Ivan Krizsan, https://github.com/krizsan"
+LABEL maintainer="Jason Levine <levineja@mail.nih.gov>"
 
 # Set this environment variable to True to set timezone on container start.
 ENV SET_CONTAINER_TIMEZONE False
 # Default container timezone as found under the directory /usr/share/zoneinfo/.
-ENV CONTAINER_TIMEZONE Europe/Stockholm
+ENV CONTAINER_TIMEZONE America/New_York
+# Elastalert version
+ENV ELASTALERT_VERSION 0.2.0b2
 # URL from which to download Elastalert.
-ENV ELASTALERT_URL https://github.com/Yelp/elastalert/archive/master.zip
+ENV ELASTALERT_URL https://github.com/Yelp/elastalert/archive/v${ELASTALERT_VERSION}.zip
 # Directory holding configuration for Elastalert and Supervisor.
 ENV CONFIG_DIR /opt/config
 # Elastalert rules directory.
@@ -38,7 +40,7 @@ ENV ELASTALERT_HOME /opt/elastalert
 # Supervisor configuration file for Elastalert.
 ENV ELASTALERT_SUPERVISOR_CONF ${CONFIG_DIR}/elastalert_supervisord.conf
 # Alias, DNS or IP of Elasticsearch host to be queried by Elastalert. Set in default Elasticsearch configuration file.
-ENV ELASTICSEARCH_HOST elasticsearchhost
+ENV ELASTICSEARCH_HOST elasticsearch
 # Port on above Elasticsearch host. Set in default Elasticsearch configuration file.
 ENV ELASTICSEARCH_PORT 9200
 # Use TLS to connect to Elasticsearch (True or False)
@@ -46,14 +48,14 @@ ENV ELASTICSEARCH_TLS False
 # Verify TLS
 ENV ELASTICSEARCH_TLS_VERIFY True
 # ElastAlert writeback index
-ENV ELASTALERT_INDEX elastalert_status
+ENV ELASTALERT_INDEX elastalert
 
 WORKDIR /opt
 
 # Install software required for Elastalert and NTP for time synchronization.
 RUN apk update && \
     apk upgrade && \
-    apk add ca-certificates openssl-dev openssl libffi-dev python2 python2-dev py2-pip py2-yaml gcc musl-dev tzdata openntpd wget && \
+    apk add ca-certificates openssl-dev openssl libffi-dev python2 python2-dev py2-pip py2-yaml gcc musl-dev tzdata openntpd wget libmagic && \
 # Download and unpack Elastalert.
     wget -O elastalert.zip "${ELASTALERT_URL}" && \
     unzip elastalert.zip && \
@@ -61,6 +63,9 @@ RUN apk update && \
     mv e* "${ELASTALERT_HOME}"
 
 WORKDIR "${ELASTALERT_HOME}"
+
+# Fix issue with versions of pip ES library 7+
+# RUN sed -i 's/elasticsearch/elasticsearch<7/g' setup.py
 
 # Install Elastalert.
 RUN python setup.py install && \
@@ -84,6 +89,9 @@ RUN python setup.py install && \
     apk del openssl-dev && \
     apk del libffi-dev && \
     rm -rf /var/cache/apk/*
+
+# Fix timezone issue (since Docker Swarm won't let us set clock capabilities)
+RUN echo "UTC" > /etc/timezone
 
 # Copy the script used to launch the Elastalert when a container is started.
 COPY ./start-elastalert.sh /opt/
