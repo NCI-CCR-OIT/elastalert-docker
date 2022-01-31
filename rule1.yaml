@@ -1,0 +1,35 @@
+smtp_host: "mailfwd.nih.gov"
+from_addr: "noreply@ccr.cancer.gov"
+email:
+- "levineja@mail.nih.gov"
+- "andonyac@mail.nih.gov"
+email_format: html
+
+es_host: elasticsearch
+es_port: 9200
+name: "PRES protocol data changed"
+type: frequency
+index: logstash*
+num_events: 1
+timeframe:
+  minutes: 1
+filter:
+- query:
+    match_phrase:
+      message: "Protocol data CHANGED"
+- query:
+    match_phrase:
+      amqpRoutingKey: "json-event.pres-iris-sync.info"
+alert:
+- "email"
+alert_subject: "Changed protocol info synced from iRIS to PRES ({0})"
+alert_subject_args: [ "@timestamp" ]
+alert_text: |
+    <div style="margin-bottom:1em;">
+      <strong>{0} protocol(s)</strong> with changed information synced from PRES to iRIS at {1}.
+    </div>
+    <div style="margin-bottom:1em;">
+      To see more information <a href="https://ccr-ds1.nci.nih.gov/kibana/app/kibana#/context/f9d64f40-c018-11e8-b83d-491dfe8a3839/_doc/{2}?_a=(columns:!(logLevel,message,source,sourceHost),filters:!(('$state':(store:appState),meta:(alias:!n,disabled:!f,index:f9d64f40-c018-11e8-b83d-491dfe8a3839,key:query,negate:!f,type:custom,value:'%7B%22regexp%22:%7B%22amqpRoutingKey.keyword%22:%22.*pres-iris-sync.*%22%7D%7D'),query:(regexp:(amqpRoutingKey.keyword:'.*pres-iris-sync.*')))),predecessorCount:5,sort:!('@timestamp',desc),successorCount:5)&_g=(filters:!(),refreshInterval:(pause:!f,value:900000),time:(from:now%2Fd,to:now%2Fd))">click here</a> for the context around the event that initiated this alert, or <a href="https://ccr-ds1.nci.nih.gov/kibana/app/kibana#/dashboard/9fd6e350-888c-11e9-ae27-0bfdbb9fa199">click here</a> for the general sync log dashboard.
+    </div>
+alert_text_type: alert_text_only
+alert_text_args: [ "num_matches", "@timestamp", "_id" ]
